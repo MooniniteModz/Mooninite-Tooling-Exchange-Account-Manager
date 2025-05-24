@@ -55,7 +55,7 @@ param (
     [string]$EmployeeEmail
 )
 
-### Set Execution Policy
+### --- Set Execution Policy ---
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser
 
 ### Global Variables
@@ -96,7 +96,6 @@ function Check-PowerShell7 {
         #[void][System.Console]::ReadKey($true)
     }
 }
-
 function Install-RequiredModules {
     # Define the module names
     $exchangeModuleName = "ExchangeOnlineManagement"
@@ -137,7 +136,7 @@ function Install-RequiredModules {
 }
 
 
-#Menu Functions
+#--- Menu Functions ---
 function Show-Logo {
     Write-Host "
                                  ███╗   ███╗ ██████╗  ██████╗ ███╗   ██╗██╗███╗   ██╗██╗████████╗███████╗    ████████╗ ██████╗  ██████╗ ██╗     ██╗███╗   ██╗ ██████╗
@@ -152,7 +151,6 @@ function Show-Logo {
     Write-Host "                                                                =======================================================" -ForegroundColor Cyan
     Write-Host "                                                                                                            Version 4.0" -ForegroundColor Green
 }
-
 function Show-MainMenu {
     Write-Host "Main Menu:" -ForegroundColor Green
     Write-Host "1. Search for recoverable items on user account" -ForegroundColor White
@@ -171,14 +169,12 @@ function Set-AdminEmail {
     $Global:TechEmail = Read-Host
     Write-Host "Admin email set to: $Global:TechEmail" -ForegroundColor Green
 }
-
 function Set-EmployeeEmail {
     write-host "Enter the email address of the UPT Employee you are wanting to query or edit below:" -ForegroundColor Yellow
     $Global:EmployeeEmail = Read-Host
     Write-Host "Employee email set to: $Global:EmployeeEmail" -ForegroundColor Green
     Write-Host ""
 }
-
 function Prepare-UserMailbox {
     if ([string]::IsNullOrEmpty($Global:TechEmail) -or [string]::IsNullOrEmpty($Global:EmployeeEmail)) {
         Write-Host "Please set both Admin and Employee email addresses first." -ForegroundColor Red
@@ -214,7 +210,6 @@ function Prepare-UserMailbox {
     Write-Host "User mailbox prepared successfull!!!" -ForegroundColor Green
     Write-Host "`n`n`n`n`n"
 }
-
 function Find-FolderIDs {
     if ([string]::IsNullOrEmpty($Global:TechEmail) -or [string]::IsNullOrEmpty($Global:EmployeeEmail)) {
         Write-Host "Please set both Admin and Employee email addresses first." -ForegroundColor Red
@@ -312,7 +307,6 @@ function Find-FolderIDs {
     Write-Host "Folder IDs found successfully." -ForegroundColor Green
     Write-Host "`n`n`n`n`n"
 }
-
 function Run-ComplianceSearch {
     Write-Host "Step [3]: Create Compliance Search for '$Global:EmployeeEmail'"
     Write-Host "————————————————————————————————————————————————————————————————————————————————————————————————"
@@ -341,7 +335,7 @@ function Run-ComplianceSearch {
     $Global:SearchName = "$Global:EmployeeEmail-Purge"
 
     Connect-IPPSSession -ShowBanner:$false -UserPrincipalName $Global:TechEmail
-
+    Connect-ExchangeOnline  -ShowBanner:$false -UserPrincipalName $Global:TechEmail
     New-ComplianceSearch -Name $Global:SearchName -ExchangeLocation $Global:EmployeeEmail -ContentMatchQuery "$Global:RecoverableItemFolderId OR $Global:DeletionsFolderId OR $Global:DiscoveryHoldsFolderId OR $Global:SearchDiscoveryHoldsFolderId OR $Global:SubstrateHoldsFolderId"
     Start-Sleep -Seconds 5
     Start-ComplianceSearch -Identity $Global:SearchName
@@ -372,7 +366,6 @@ function Run-ComplianceSearch {
     #Write-Host ""
     ###[void][System.Console]::ReadKey($true)
 }
-
 function Run-PurgeOperation {
     if ([string]::IsNullOrEmpty($Global:SearchName)) {
         Write-Host "Please run compliance search first." -ForegroundColor Red
@@ -471,7 +464,6 @@ function Run-PurgeOperation {
     ##Write-Host ""
     ###[void][System.Console]::ReadKey($true)
 }
-
 function Restore-MailboxSettings {
     if ([string]::IsNullOrEmpty($Global:TechEmail) -or [string]::IsNullOrEmpty($Global:EmployeeEmail)) {
         Write-Host "Please set both Admin and Employee email addresses first." -ForegroundColor Red
@@ -501,7 +493,7 @@ function Restore-MailboxSettings {
 }
 
 
-# --- main job functions ---
+# --- Main Script Execution functions ---
 function Search-RecoverableItems {
     Check-PowerShell7
     Install-RequiredModules
@@ -561,7 +553,6 @@ function Search-RecoverableItems {
     Write-Host "Press enter to conitnue......"
     [void][System.Console]::ReadKey($true)
 }
-
 function Purge-RecoverableItems {
     Check-PowerShell7
     Install-RequiredModules
