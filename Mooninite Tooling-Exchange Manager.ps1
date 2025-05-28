@@ -12,9 +12,9 @@
     File Name      : Clean-RecoverableItems.ps1
     Author         : Con Moore
     Prerequisite   : PowerShell V.7.2.18 or later, Exchange Online Managment Module, Compliance Managment Module
-    Version        : 4.0
+    Version        : 5.0
     Created Date   : 03/10/2024
-    Last Modified  : 04/14/2025
+    Last Modified  : 05/24/2025
 
     Version History:
     - 1.0: Initial script - Trash🗑️....work in progress....2024/03/10
@@ -30,6 +30,8 @@
         -Simplified menu to focus on two core functions
         -Added Search-RecoverableItems function to quickly view folder sizes
         -Refactored Script to be function driven instead of procedural for easier managment
+    - 5.0: 2025/05/24
+        -Refactored script to use new syntax that is complinant with the new Purview Compliance Center (I.E FolderID:"FolderId" to FolderID="FolderId")
 
 .EXAMPLE
     .\Clean-RecoverableItems.ps1
@@ -39,7 +41,7 @@
     2. Purge recoverable items folder - Permanently removes all items from the recoverable items folder
 
     *Note: To execute this command, it is necessary to grant the admin email account permissions for conducting searches and making modifications to accounts within Exchange.
-     This requires Exchange and Compliance Center admin permissions. Ensure PIMs is setup to check our the required roles.
+     This requires Exchange and Compliance Center admin permissions. Ensure PIMs is setup with the required roles.
 
 #EndRegion-Synopsis#>
 
@@ -184,7 +186,7 @@ function Prepare-UserMailbox {
     }
 
     Connect-ExchangeOnline -ShowBanner:$false -UserPrincipalName $Global:TechEmail
-    write-host "Step [1]: Prepare '$Global:EmployeeEmail' for processing......"
+    write-host "Step [1]: Prepare '$Global:EmployeeEmail' for processing......" -ForegroundColor Green
     Write-Host "————————————————————————————————————————————————————————————————————————————————————————————————"
     Write-Host ""
     Write-Host "Disabling WS, Active Sync, MAPI, OWA, IMAP, and POP for $Global:EmployeeEmail........" -ForegroundColor Yellow
@@ -225,7 +227,32 @@ function Find-FolderIDs {
     }
 
     $folderQueries = @()
-    $folderStatistics = Get-MailboxFolderStatistics $Global:EmployeeEmail -FolderScope RecoverableItems
+
+    # Check if mailbox exists first
+    try {
+        $mailboxCheck = Get-Mailbox -Identity $Global:EmployeeEmail -ErrorAction Stop
+        Write-Host "Mailbox found: $($mailboxCheck.DisplayName)" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Error: Unable to find mailbox '$Global:EmployeeEmail'" -ForegroundColor Red
+        Write-Host "Please verify the email address is correct and the mailbox exists." -ForegroundColor Red
+        Write-Host "Error details: $($_.Exception.Message)" -ForegroundColor Red
+        return
+    }
+
+    try {
+        $folderStatistics = Get-MailboxFolderStatistics $Global:EmployeeEmail -FolderScope RecoverableItems -ErrorAction Stop
+    }
+    catch {
+        Write-Host "Error: Unable to retrieve mailbox folder statistics for '$Global:EmployeeEmail'" -ForegroundColor Red
+        Write-Host "Error details: $($_.Exception.Message)" -ForegroundColor Red
+        return
+    }
+
+    if ($null -eq $folderStatistics -or $folderStatistics.Count -eq 0) {
+        Write-Host "No recoverable items folders found for '$Global:EmployeeEmail'" -ForegroundColor Yellow
+        return
+    }
     foreach ($folderStatistic in $folderStatistics) {
         $folderId = $folderStatistic.FolderId;
         $folderPath = $folderStatistic.FolderPath;
@@ -235,14 +262,14 @@ function Find-FolderIDs {
         $indexIdBytes = New-Object byte[] 48;
         $indexIdIdx = 0;
         $folderIdBytes | select -skip 23 -First 24 | %{$indexIdBytes[$indexIdIdx++]=$nibbler[$_ -shr 4];$indexIdBytes[$indexIdIdx++]=$nibbler[$_ -band 0xF]}
-        $folderQuery = "folderid:$($encoding.GetString($indexIdBytes))";
+        $folderQuery = "folderid=$($encoding.GetString($indexIdBytes))";
         $folderStat = New-Object PSObject
         Add-Member -InputObject $folderStat -MemberType NoteProperty -Name FolderPath -Value $folderPath
         Add-Member -InputObject $folderStat -MemberType NoteProperty -Name FolderQuery -Value $folderQuery
         $folderQueries += $folderStat
     }
 
-    write-host "Step [2]: Find all folder IDs for '$Global:EmployeeEmail' and their respective IDs."
+    write-host "Step [2]: Find all folder IDs for '$Global:EmployeeEmail' and their respective IDs." -ForegroundColor Green
     Write-Host " ————————————————————————————————————————————————————————————————————————————————————————————————"
     Write-Host ""
     # Assign various folder ID to VAR using Regular Expression
@@ -251,56 +278,86 @@ function Find-FolderIDs {
 
     # Find Recoverable Items Folder ID
     $RecoverableItemsString = $folderQueries | Select-String "/Recoverable Items"
-    $pattern = 'folderid:([A-Za-z0-9+/=]+)'
-    $match = [regex]::Match($RecoverableItemsString, $pattern)
+    if ($RecoverableItemsString) {
+        $pattern = 'folderid=([A-Za-z0-9+/=]+)'
+        $match = [regex]::Match($RecoverableItemsString, $pattern)
 
-    if ($match.Success) {
-        $Global:RecoverableItemFolderId = $match.value
-        Write-host "Found Recoverable Items Folder - $Global:RecoverableItemFolderId" -ForegroundColor Cyan
+        if ($match.Success) {
+            $Global:RecoverableItemFolderId = $match.value
+            Write-host "Found Recoverable Items Folder - $Global:RecoverableItemFolderId" -ForegroundColor Cyan
+        }
+    } else {
+        Write-Host "Warning: Recoverable Items folder not found" -ForegroundColor Yellow
     }
 
     # Find Deletions Folder ID
     $DeletionsString = $folderQueries | Select-String "/Deletions"
+    if ($DeletionsString) {
+        $pattern = "folderid=([A-Za-z0-9\+/=]+)"
+        $match = [regex]::Match($DeletionsString, $pattern)
 
-    $pattern = "folderid:([A-Za-z0-9\+/=]+)"
-
-
-    $match = [regex]::Match($DeletionsString, $pattern)
-
-    if ($match.Success) {
-        $Global:DeletionsFolderId = $match.value
-        Write-host "Found Deletions Folder         - $Global:DeletionsFolderId" -ForegroundColor Cyan
+        if ($match.Success) {
+            $Global:DeletionsFolderId = $match.value
+            Write-host "Found Deletions Folder         - $Global:DeletionsFolderId" -ForegroundColor Cyan
+        }
+    } else {
+        Write-Host "Warning: Deletions folder not found" -ForegroundColor Yellow
     }
 
     # Find DiscoveryHolds Folder ID
     $DiscoveryHoldsString = $folderQueries | Select-String "/DiscoveryHolds"
-    $pattern = "folderid:([A-Za-z0-9+/=]+)"
+    if ($DiscoveryHoldsString) {
+        $pattern = "folderid=([A-Za-z0-9+/=]+)"
+        $match = [regex]::Match($DiscoveryHoldsString, $pattern)
 
-    $match = [regex]::Match($DiscoveryHoldsString, $pattern)
-
-    if ($match.Success) {
-        $Global:DiscoveryHoldsFolderId = $match.value
-        Write-host "Found DiscoveryHolds Folder    - $Global:DiscoveryHoldsFolderId" -ForegroundColor Cyan
+        if ($match.Success) {
+            $Global:DiscoveryHoldsFolderId = $match.value
+            Write-host "Found DiscoveryHolds Folder    - $Global:DiscoveryHoldsFolderId" -ForegroundColor Cyan
+        }
+    } else {
+        Write-Host "Warning: DiscoveryHolds folder not found" -ForegroundColor Yellow
     }
 
     # Find SearchDiscoveryHoldsFolder Folder ID
     $SearchDiscoveryHoldsFolderString = $folderQueries | Select-String "/DiscoveryHolds/SearchDiscoveryHoldsFolder"
-    $pattern = "folderid:([A-Za-z0-9+/=]+)"
-    $match = [regex]::Match($SearchDiscoveryHoldsFolderString, $pattern)
+    if ($SearchDiscoveryHoldsFolderString) {
+        $pattern = "folderid=([A-Za-z0-9+/=]+)"
+        $match = [regex]::Match($SearchDiscoveryHoldsFolderString, $pattern)
 
-    if ($match.Success) {
-        $Global:SearchDiscoveryHoldsFolderId = $match.value
-        Write-host "Found Search Discovery Holds Folder    - $Global:SearchDiscoveryHoldsFolderId" -ForegroundColor Cyan
+        if ($match.Success) {
+            $Global:SearchDiscoveryHoldsFolderId = $match.value
+            Write-host "Found Search Discovery Holds Folder    - $Global:SearchDiscoveryHoldsFolderId" -ForegroundColor Cyan
+        }
+    } else {
+        Write-Host "Warning: SearchDiscoveryHoldsFolder not found" -ForegroundColor Yellow
     }
 
     # Find SubstrateHolds
     $SubstrateHoldsString = $folderQueries | Select-String "/SubstrateHolds"
-    $pattern = "folderid:([A-Za-z0-9+/=]+)"
-    $match = [regex]::Match($SubstrateHoldsString, $pattern)
+    if ($SubstrateHoldsString) {
+        $pattern = "folderid=([A-Za-z0-9+/=]+)"
+        $match = [regex]::Match($SubstrateHoldsString, $pattern)
 
-    if ($match.Success) {
-        $Global:SubstrateHoldsFolderId = $match.value
-        Write-host "Found SubstrateHolds Folder    - $Global:SubstrateHoldsFolderId" -ForegroundColor Cyan
+        if ($match.Success) {
+            $Global:SubstrateHoldsFolderId = $match.value
+            Write-host "Found SubstrateHolds Folder    - $Global:SubstrateHoldsFolderId" -ForegroundColor Cyan
+        }
+    } else {
+        Write-Host "Warning: SubstrateHolds folder not found" -ForegroundColor Yellow
+    }
+
+    # Find Purges Folder ID
+    $PurgesString = $folderQueries | Select-String "/Purges"
+    if ($PurgesString) {
+        $pattern = "folderid=([A-Za-z0-9+/=]+)"
+        $match = [regex]::Match($PurgesString, $pattern)
+
+        if ($match.Success) {
+            $Global:PurgesFolderId = $match.value
+            Write-host "Found Purges Folder            - $Global:PurgesFolderId" -ForegroundColor Cyan
+        }
+    } else {
+        Write-Host "Warning: Purges folder not found" -ForegroundColor Yellow
     }
 
     Write-Host ""
@@ -308,7 +365,7 @@ function Find-FolderIDs {
     Write-Host "`n`n`n`n`n"
 }
 function Run-ComplianceSearch {
-    Write-Host "Step [3]: Create Compliance Search for '$Global:EmployeeEmail'"
+    Write-Host "Step [3]: Create Compliance Search for '$Global:EmployeeEmail'" -ForegroundColor Green
     Write-Host "————————————————————————————————————————————————————————————————————————————————————————————————"
     Write-Host ""
     Write-Host "Starting Compliance Search..." -ForegroundColor Yellow
@@ -336,7 +393,7 @@ function Run-ComplianceSearch {
 
     Connect-IPPSSession -ShowBanner:$false -UserPrincipalName $Global:TechEmail
     Connect-ExchangeOnline  -ShowBanner:$false -UserPrincipalName $Global:TechEmail
-    New-ComplianceSearch -Name $Global:SearchName -ExchangeLocation $Global:EmployeeEmail -ContentMatchQuery "$Global:RecoverableItemFolderId OR $Global:DeletionsFolderId OR $Global:DiscoveryHoldsFolderId OR $Global:SearchDiscoveryHoldsFolderId OR $Global:SubstrateHoldsFolderId"
+    New-ComplianceSearch -Name $Global:SearchName -ExchangeLocation $Global:EmployeeEmail -ContentMatchQuery "$Global:RecoverableItemFolderId OR $Global:DeletionsFolderId OR $Global:DiscoveryHoldsFolderId OR $Global:SearchDiscoveryHoldsFolderId OR $Global:SubstrateHoldsFolderId OR $Global:PurgesFolderId"
     Start-Sleep -Seconds 5
     Start-ComplianceSearch -Identity $Global:SearchName
 
@@ -376,8 +433,10 @@ function Run-PurgeOperation {
 
     Do {
 
-        Write-Host "Step [4]: Start Compliance Search Action to purge E-Mails"
-        Write-Host "————————————————————————————————————————————————————————————————————————————————————————————————"
+        Write-Host "Step [4]: Start Compliance Search Action to purge E-Mails" -ForegroundColor Green
+        Write-Host "————————————————————————————————————————————————————————————————————————————————————————————————" -ForegroundColor DarkYellow
+        Write-Host "Search Name   -   Purge Name  -  Purge Type         -             Running As      -      Purge Status" -ForegroundColor Green
+        Write-Host "————————————————————————————————————————————————————————————————————————————————————————————————" -ForegroundColor DarkYellow
         New-ComplianceSearchAction -SearchName "${Global:SearchName}" -Purge -PurgeType HardDelete -Confirm:$false
         $ComplianceSearchActionStatus = (Get-ComplianceSearchAction -Identity "${Global:SearchName}_Purge").Status
 
@@ -448,6 +507,7 @@ function Run-PurgeOperation {
         if ($sizeInGB -ge 20) {
             Write-Host ""
             Write-Host "The folder size is still $sizeInGB GB, restarting the job to continue clearing items." -ForegroundColor cyan
+            get-mailboxFolderStatistics $Global:EmployeeEmail -FolderScope recoverableitems | Select identity, foldersize, hostname
             Write-Host "`n`n`n`n"
             Remove-ComplianceSearchAction -Identity "${Global:SearchName}_Purge" -Confirm:$false
             #Write-Host "———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————" -ForegroundColor Green
@@ -566,7 +626,7 @@ function Purge-RecoverableItems {
     }
 
     # Confirm the purge operation
-     #clear-host
+     clear-host
     Write-Host "`n⚠️ WARNING: This will permanently delete all items in the recoverable items folder for $Global:EmployeeEmail." -ForegroundColor Red
     Write-Host "This action cannot be undone and will remove all recovery options for deleted items." -ForegroundColor Red
     $confirm = Read-Host "Are you sure you want to proceed? (Y/N)"
@@ -578,7 +638,7 @@ function Purge-RecoverableItems {
         return
     }
 
-    # clear-host
+    clear-host
     Show-Logo
     Write-Host "================================================================================"
     Write-Host "Starting purge operation for $Global:EmployeeEmail..." -ForegroundColor Green
@@ -588,22 +648,22 @@ function Purge-RecoverableItems {
     Prepare-UserMailbox
 
     # Find folder IDs
-    #clear-host
+    clear-host
     Show-Logo
     Find-FolderIDs
 
     # Run compliance search
-    #clear-host
+    clear-host
     Show-Logo
     Run-ComplianceSearch
 
     # Run purge operation
-    #clear-host
+    clear-host
     Show-Logo
     Run-PurgeOperation
 
     # Restore mailbox settings
-    #clear-host
+    clear-host
     Show-Logo
     Restore-MailboxSettings
 
