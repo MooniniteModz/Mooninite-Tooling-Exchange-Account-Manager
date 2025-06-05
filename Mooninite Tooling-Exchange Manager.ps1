@@ -630,7 +630,7 @@ function Purge-RecoverableItems {
     Write-Host "`n⚠️ WARNING: This will permanently delete all items in the recoverable items folder for $Global:EmployeeEmail." -ForegroundColor Red
     Write-Host "This action cannot be undone and will remove all recovery options for deleted items." -ForegroundColor Red
     $confirm = Read-Host "Are you sure you want to proceed? (Y/N)"
-
+      
     if ($confirm -ne "Y" -and $confirm -ne "y") {
         Write-Host "Operation cancelled by user." -ForegroundColor Yellow
         #Write-Host ""
