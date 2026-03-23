@@ -23,7 +23,7 @@ PowerShell tool for searching and purging the Recoverable Items folder on Exchan
 
 ---
 
-## Requirements
+# Requirements
 
 - PowerShell 7.2+ — the script will auto-download and install PS7 if you're running it from Windows PowerShell 5.x
 - ExchangeOnlineManagement module — auto-installed from PSGallery if missing
