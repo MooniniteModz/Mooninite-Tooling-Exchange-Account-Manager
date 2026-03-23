@@ -33,17 +33,17 @@ PowerShell tool for searching and purging the Recoverable Items folder on Exchan
 
 ## Usage
 powershell.\Clean-RecoverableItems.ps1
-- On first run, you'll be prompted for domain admin credentials (format: DOMAIN\xadm_username), then your Exchange admin email, and then the target employee mailbox. From there, the menu handles the rest.
+- On first run, you'll be prompted for domain admin credentials (format: DOMAIN\username), then your Exchange admin email, and then the target employee mailbox. From there, the menu handles the rest.
 Main Menu:
-1. Search for recoverable items on user account
-2. Purge recoverable items folder
-Q. Quit
-Granting Compliance Permissions
+- 1. Search for recoverable items on user account
+- 2. Purge recoverable items folder
+- Q. Quit
 
+
+## Granting Compliance Permissions
 The admin account running the search/purge needs these roles assigned in the Purview Compliance Center:
 - Compliance Search Administrator
 - Compliance Administrator (or equivalent that grants New-ComplianceSearchAction)
-
 - If you're using PIM, activate both roles before running the script.
 - Purview Compliance Center Syntax (v5.0)
 - As of v5.0, the script uses the updated Purview Compliance Center syntax for content match queries. The old FolderID:"value" format has been replaced with FolderID=value to match current Microsoft requirements.
