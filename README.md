@@ -32,7 +32,7 @@ PowerShell tool for searching and purging the Recoverable Items folder on Exchan
 
 
 ## Usage
-# powershell.\Clean-RecoverableItems.ps1
+powershell.\Clean-RecoverableItems.ps1
 - On first run, you'll be prompted for domain admin credentials (format: DOMAIN\xadm_username), then your Exchange admin email, and then the target employee mailbox. From there, the menu handles the rest.
 Main Menu:
 1. Search for recoverable items on user account
