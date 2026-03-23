@@ -5,8 +5,7 @@ PowerShell tool for searching and purging the Recoverable Items folder on Exchan
 
 
 
-## What It Does
-# Two things, and it does them well:
+## What It Does - Two things, and it does them well:
 
 - Search: Connects to Exchange Online, pulls Get-MailboxFolderStatistics scoped to RecoverableItems, and gives you a per-folder breakdown (path, size, item count, creation date) with a total summary. Quick way to - see how bad things are before you commit to a purge.
 - Purge: The full pipeline. Preps the mailbox (disables EWS, ActiveSync, MAPI, OWA, IMAP, POP, turns off single-item recovery, kills holds), resolves all the hidden folder IDs (Deletions, DiscoveryHolds, SubstrateHolds, Purges, etc.), runs a Compliance Search against those folders, executes a HardDelete purge action, and loops until the recoverable items folder drops below 20GB. Then it puts everything back the way it was.
