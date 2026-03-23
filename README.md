@@ -13,7 +13,7 @@ PowerShell tool for searching and purging the Recoverable Items folder on Exchan
 ---
 
 ## The Purge Pipeline (step by step)
-# Prepare Mailbox → Find Folder IDs → Compliance Search → HardDelete Purge (loop) → Restore Settings
+- Prepare Mailbox → Find Folder IDs → Compliance Search → HardDelete Purge (loop) → Restore Settings
 
 - Prepare: Disables all client access protocols, sets retention to 0, disables single-item recovery, removes litigation holds, stops the Managed Folder Assistant
 - Folder IDs: Converts Exchange folder IDs from Base64 to hex-encoded format compatible with Purview Compliance Search queries
